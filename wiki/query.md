@@ -21,17 +21,17 @@ For the advanced BloodHound user, experience with Cypher queries required. Allow
 
 Return all users with a path to DAs
 ```
-python3 max.py query "match (u:User)-[r*1..]->(g:Group) where g.objectid ends with '-512' return u.name"
+python3 max.py query -q "match (u:User)-[r*1..]->(g:Group) where g.objectid ends with '-512' return u.name"
 ```
 
 Return amount of computers each user is admin to, and output separated by commas (CSV)
 ```
-python3 max.py query "match (u:User)-[r:MemberOf|AdminTo*1..]->(c:Computer) return u.name,count(c.name) order by count(c.name) desc" -d ","
+python3 max.py query -q "match (u:User)-[r:MemberOf|AdminTo*1..]->(c:Computer) return u.name,count(c.name) order by count(c.name) desc" -d ","
 ```
 
 Return the path from Domain Users to Domain Admins
 ```
-python3 max.py query "match p=allShortestPaths((g1:Group {name:'DOMAIN USERS@DOMAIN.LOCAL'})-[*1..]->(g2:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'})) return p" --path
+python3 max.py query -q "match p=allShortestPaths((g1:Group {name:'DOMAIN USERS@DOMAIN.LOCAL'})-[*1..]->(g2:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'})) return p" --path
 ```
 
 Run queries specified in a file
