@@ -946,6 +946,10 @@ def dpat_func(args):
                 "label" : "Enabled Accounts With Passwords Set Over 1yr Ago Cracked"
             },
             {
+                "query" : "MATCH (u:User {cracked:true}) WHERE u.pwdlastset > (datetime().epochseconds - (90 * 86400)) AND NOT u.pwdlastset IN [-1.0, 0.0] AND u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Enabled Accounts With Passwords Set in the last 90 days Cracked"
+            },
+            {
                 "query" : "MATCH (u:User {cracked:true,pwdneverexpires:true}) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
                 "label" : "Enabled Accounts With Passwords That Never Expire Cracked"
             },
@@ -1038,6 +1042,10 @@ def dpat_func(args):
             {
                 "query" : "MATCH (u:User {cracked:true}) WHERE u.pwdlastset < (datetime().epochseconds - (365 * 86400)) AND NOT u.pwdlastset IN [-1.0, 0.0] RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
                 "label" : "Accounts With Passwords Set Over 1yr Ago Cracked"
+            },
+            {
+                "query" : "MATCH (u:User {cracked:true}) WHERE u.pwdlastset > (datetime().epochseconds - (90 * 86400)) AND NOT u.pwdlastset IN [-1.0, 0.0] RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Accounts With Passwords Set in the last 90 days Cracked"
             },
             {
                 "query" : "MATCH (u:User {cracked:true,pwdneverexpires:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
