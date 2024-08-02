@@ -38,6 +38,7 @@ This module with full usage details was released in this blog post: [whynotsecur
 * If you're looking for all accounts using a certain password, you can search using the `-e/--password` flag and inputting the target password. Again, best used with the `--noparse` flag with info already stored
 * The `--own-cracked` flag will mark all cracked users as `Owned` in the Bloodhound database.
 * The `--add-crack-note` flag will add a note to cracked users indicating that their password has been cracked.
+* The `--only-enabled` flag will filter the statistics based on enabled users only.
 
 
 #### NTDS.dit Extraction & Parsing
