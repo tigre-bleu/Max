@@ -551,7 +551,7 @@ def export_func(args):
 
     export_data = zip_longest(*data, fillvalue='')
     filename = node_name.replace(" ","_") + ".csv"
-    with open(filename,'w', encoding='utf-8', newline='') as file:
+    with open(filename,'w', encoding='utf-8', newline='', error='ignore') as file:
         wr = csv.writer(file)
         wr.writerows(export_data)
     file.close()
@@ -771,7 +771,7 @@ def dpat_func(args):
     if not args.noparse:
 
         if args.ntdsfile != None:
-            ntds = open(args.ntdsfile, 'r').readlines()
+            ntds = open(args.ntdsfile, 'r', encoding='utf-8').readlines()
         else:
             print("[-] Error, Need NTDS file")
             return
@@ -886,99 +886,191 @@ def dpat_func(args):
     ### Automated Cypher Queries for standard stuff, outputting users
     ###
 
-    queries = [
-        {
-            'query' : "MATCH (u:User) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
-            'label' : "All User Accounts"
-        },
-        {
-            'query' : "MATCH (u:User {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            'label' : "All User Accounts Cracked"
-        },
-        {
-            "query" : "MATCH p=(u:User {cracked:true}) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            "label" : "Enabled User Accounts Cracked"
-        },
-        {
-            'query' : "MATCH p=(u:User {cracked:true})-[r:MemberOf*1..]->(g:Group {highvalue:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            'label' : "High Value User Accounts Cracked"
-        },
-        {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
-            'label' : "Domain Admin Members"
-        },
-        {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            'label' : "Domain Admin Members Cracked"
-        },
-        {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
-            'label' : "Enterprise Admin Members"
-        },
-        {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            'label' : "Enterprise Admin Accounts Cracked"
-        },
-        {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User)-[r:MemberOf]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
-            'label' : "Administrator Group Members"
-        },
-        {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User {cracked:true})-[r:MemberOf]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            'label' : "Administrator Group Member Accounts Cracked"
-        },
-        {
-            'query' : "MATCH (u:User {cracked:true,hasspn:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            'label' : "Kerberoastable Users Cracked"
-        },
-        {
-            'query' : "MATCH (u:User {cracked:true,dontreqpreauth:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            'label' : "Accounts Not Requiring Kerberos Pre-Authentication Cracked"
-        },
-        {
-            'query' : "MATCH (u:User {cracked:true,unconstraineddelegation:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            'label' : "Unconstrained Delegation Accounts Cracked"
-        },
-        {
-            "query" : "MATCH (u:User {cracked:true}) WHERE u.lastlogon < (datetime().epochseconds - (182 * 86400)) AND NOT u.lastlogon IN [-1.0, 0.0] RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            "label" : "Inactive Accounts (Last Used Over 6mos Ago) Cracked"
-        },
-        {
-            "query" : "MATCH (u:User {cracked:true}) WHERE u.pwdlastset < (datetime().epochseconds - (365 * 86400)) AND NOT u.pwdlastset IN [-1.0, 0.0] RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            "label" : "Accounts With Passwords Set Over 1yr Ago Cracked"
-        },
-        {
-            "query" : "MATCH (u:User {cracked:true,pwdneverexpires:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            "label" : "Accounts With Passwords That Never Expire Cracked"
-        },
-    ]
-
-    intense_queries = [
-        {
-            "query" : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-516' MATCH (c:Computer)-[MemberOf]->(g) WITH COLLECT(c) AS dcs MATCH (u:User {cracked:true}),(n {unconstraineddelegation:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NOT n IN dcs AND NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash,n.name",
-            "label" : "Accounts With Paths To Unconstrained Delegation Objects Cracked (Excluding DCs)"
-        },
-        {
-            "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            "label" : "Accounts With Paths To High Value Targets Cracked"
-        },
-        {
-            "query" : "MATCH p1=(u:User {cracked:true})-[r:AdminTo]->(n1) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            "label" : "Accounts With Explicit Admin Rights Cracked"
-        },
-        {
-            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdmintTo]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            "label" : "Accounts With Group Delegated Admin Rights Cracked"
-        },
-        {
-            "query" : "MATCH p1=(u:User {cracked:true})-[r:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n1) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            "label" : "Accounts With Explicit Controlling Privileges Cracked"
-        },
-        {
-            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            "label" : "Accounts With Group Delegated Controlling Privileges Cracked"
-        }
-    ]
+    if args.only_enabled:
+        print("[+] Only enabled users will be analysed")
+        queries = [
+            {
+                'query' : "MATCH (u:User) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+                'label' : "All Enabled User Accounts"
+            },
+            {
+                'query' : "MATCH (u:User {cracked:true}) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "All Enabled User Accounts Cracked"
+            },
+            {
+                'query' : "MATCH p=(u:User {cracked:true})-[r:MemberOf*1..]->(g:Group {highvalue:true}) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "High Value Enabled User Accounts Cracked"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User)-[r:MemberOf*1..]->(g) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+                'label' : "Enabled Domain Admin Members"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Enabled Domain Admin Members Cracked"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User)-[r:MemberOf*1..]->(g) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+                'label' : "Enabled Enterprise Admin Members"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Enabled Enterprise Admin Accounts Cracked"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User)-[r:MemberOf]->(g) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+                'label' : "Enabled Administrator Group Members"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User {cracked:true})-[r:MemberOf]->(g) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Enabled Administrator Group Member Accounts Cracked"
+            },
+            {
+                'query' : "MATCH (u:User {cracked:true,hasspn:true}) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Enabled Kerberoastable Users Cracked"
+            },
+            {
+                'query' : "MATCH (u:User {cracked:true,dontreqpreauth:true}) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Enabled Accounts Not Requiring Kerberos Pre-Authentication Cracked"
+            },
+            {
+                'query' : "MATCH (u:User {cracked:true,unconstraineddelegation:true}) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Enabled Unconstrained Delegation Accounts Cracked"
+            },
+            {
+                "query" : "MATCH (u:User {cracked:true}) WHERE u.lastlogon < (datetime().epochseconds - (182 * 86400)) AND NOT u.lastlogon IN [-1.0, 0.0] AND u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Enabled Inactive Accounts (Last Used Over 6mos Ago) Cracked"
+            },
+            {
+                "query" : "MATCH (u:User {cracked:true}) WHERE u.pwdlastset < (datetime().epochseconds - (365 * 86400)) AND NOT u.pwdlastset IN [-1.0, 0.0] AND u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Enabled Accounts With Passwords Set Over 1yr Ago Cracked"
+            },
+            {
+                "query" : "MATCH (u:User {cracked:true,pwdneverexpires:true}) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Enabled Accounts With Passwords That Never Expire Cracked"
+            },
+        ]
+    
+        intense_queries = [
+            {
+                "query" : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-516' MATCH (c:Computer)-[MemberOf]->(g) WITH COLLECT(c) AS dcs MATCH (u:User {cracked:true}),(n {unconstraineddelegation:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NOT n IN dcs AND NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n AND u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash,n.name",
+                "label" : "Enabled Accounts With Paths To Unconstrained Delegation Objects Cracked (Excluding DCs)"
+            },
+            {
+                "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n AND u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Enabled Accounts With Paths To High Value Targets Cracked"
+            },
+            {
+                "query" : "MATCH p1=(u:User {cracked:true})-[r:AdminTo]->(n1) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Enabled Accounts With Explicit Admin Rights Cracked"
+            },
+            {
+                "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdmintTo]->(n2) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Enabled Accounts With Group Delegated Admin Rights Cracked"
+            },
+            {
+                "query" : "MATCH p1=(u:User {cracked:true})-[r:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n1) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Enabled Accounts With Explicit Controlling Privileges Cracked"
+            },
+            {
+                "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Enabled Accounts With Group Delegated Controlling Privileges Cracked"
+            }
+        ]
+    else:
+        queries = [
+            {
+                'query' : "MATCH (u:User) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+                'label' : "All User Accounts"
+            },
+            {
+                'query' : "MATCH (u:User {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "All User Accounts Cracked"
+            },
+            {
+                "query" : "MATCH p=(u:User {cracked:true}) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Enabled User Accounts Cracked"
+            },
+            {
+                'query' : "MATCH p=(u:User {cracked:true})-[r:MemberOf*1..]->(g:Group {highvalue:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "High Value User Accounts Cracked"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+                'label' : "Domain Admin Members"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Domain Admin Members Cracked"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+                'label' : "Enterprise Admin Members"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Enterprise Admin Accounts Cracked"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User)-[r:MemberOf]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+                'label' : "Administrator Group Members"
+            },
+            {
+                'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User {cracked:true})-[r:MemberOf]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Administrator Group Member Accounts Cracked"
+            },
+            {
+                'query' : "MATCH (u:User {cracked:true,hasspn:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Kerberoastable Users Cracked"
+            },
+            {
+                'query' : "MATCH (u:User {cracked:true,dontreqpreauth:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Accounts Not Requiring Kerberos Pre-Authentication Cracked"
+            },
+            {
+                'query' : "MATCH (u:User {cracked:true,unconstraineddelegation:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                'label' : "Unconstrained Delegation Accounts Cracked"
+            },
+            {
+                "query" : "MATCH (u:User {cracked:true}) WHERE u.lastlogon < (datetime().epochseconds - (182 * 86400)) AND NOT u.lastlogon IN [-1.0, 0.0] RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Inactive Accounts (Last Used Over 6mos Ago) Cracked"
+            },
+            {
+                "query" : "MATCH (u:User {cracked:true}) WHERE u.pwdlastset < (datetime().epochseconds - (365 * 86400)) AND NOT u.pwdlastset IN [-1.0, 0.0] RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Accounts With Passwords Set Over 1yr Ago Cracked"
+            },
+            {
+                "query" : "MATCH (u:User {cracked:true,pwdneverexpires:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Accounts With Passwords That Never Expire Cracked"
+            },
+        ]
+    
+        intense_queries = [
+            {
+                "query" : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-516' MATCH (c:Computer)-[MemberOf]->(g) WITH COLLECT(c) AS dcs MATCH (u:User {cracked:true}),(n {unconstraineddelegation:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NOT n IN dcs AND NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash,n.name",
+                "label" : "Accounts With Paths To Unconstrained Delegation Objects Cracked (Excluding DCs)"
+            },
+            {
+                "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Accounts With Paths To High Value Targets Cracked"
+            },
+            {
+                "query" : "MATCH p1=(u:User {cracked:true})-[r:AdminTo]->(n1) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Accounts With Explicit Admin Rights Cracked"
+            },
+            {
+                "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdmintTo]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Accounts With Group Delegated Admin Rights Cracked"
+            },
+            {
+                "query" : "MATCH p1=(u:User {cracked:true})-[r:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n1) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Accounts With Explicit Controlling Privileges Cracked"
+            },
+            {
+                "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+                "label" : "Accounts With Group Delegated Controlling Privileges Cracked"
+            }
+        ]
 
     if not args.less:
         queries = queries + intense_queries
@@ -998,7 +1090,10 @@ def dpat_func(args):
     query_output_data = []
 
     hashes = {}
-    query = "MATCH (u:User) WHERE u.nt_hash IS NOT NULL RETURN u.nt_hash,u.ntds_uname"
+    if args.only_enabled:
+        query = "MATCH (u:User) WHERE u.nt_hash IS NOT NULL AND u.enabled = TRUE RETURN u.nt_hash,u.ntds_uname"
+    else:
+        query = "MATCH (u:User) WHERE u.nt_hash IS NOT NULL RETURN u.nt_hash,u.ntds_uname"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
 
@@ -1072,7 +1167,10 @@ def dpat_func(args):
         group_query_data = {}
         group_data = []
 
-        query = "MATCH (u:User)-[:MemberOf]->(g:Group) RETURN DISTINCT g.name,u.name,u.cracked"
+        if args.only_enabled:
+            query = "MATCH (u:User)-[:MemberOf]->(g:Group) WHERE u.enabled = TRUE RETURN DISTINCT g.name,u.name,u.cracked"
+        else:
+            query = "MATCH (u:User)-[:MemberOf]->(g:Group) RETURN DISTINCT g.name,u.name,u.cracked"    
         r = do_query(args,query)
         resp = json.loads(r.text)['results'][0]['data']
         for entry in resp:
@@ -1100,7 +1198,10 @@ def dpat_func(args):
     print("[+] Generating Overall Statistics")
 
     # all password hashes
-    query = "MATCH (u:User) WHERE u.cracked IS NOT NULL RETURN u.ntds_uname,u.password,u.nt_hash,u.pwdlastset"
+    if args.only_enabled:
+        query = "MATCH (u:User) WHERE u.cracked IS NOT NULL AND u.enabled = TRUE RETURN u.ntds_uname,u.password,u.nt_hash,u.pwdlastset"
+    else:
+        query = "MATCH (u:User) WHERE u.cracked IS NOT NULL RETURN u.ntds_uname,u.password,u.nt_hash,u.pwdlastset"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     num_pass_hashes = len(resp)
@@ -1116,13 +1217,19 @@ def dpat_func(args):
     num_pass_hashes_list = sorted(num_pass_hashes_list, key = lambda x: -1 if x[1] is None else len(x[1]), reverse=True)
 
     # unique password hashes
-    query = "MATCH (u:User) RETURN COUNT(DISTINCT(u.nt_hash))"
+    if args.only_enabled:
+        query = "MATCH (u:User) WHERE u.enabled = TRUE RETURN COUNT(DISTINCT(u.nt_hash))"
+    else:
+        query = "MATCH (u:User) RETURN COUNT(DISTINCT(u.nt_hash))"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     num_uniq_hash = resp[0]['row'][0]
 
     # passwords cracked, uniques
-    query = "MATCH (u:User {cracked:True}) RETURN COUNT(DISTINCT(u)),COUNT(DISTINCT(u.password))"
+    if args.only_enabled:
+        query = "MATCH (u:User {cracked:True}) WHERE u.enabled = TRUE RETURN COUNT(DISTINCT(u)),COUNT(DISTINCT(u.password))"
+    else:
+        query = "MATCH (u:User {cracked:True}) RETURN COUNT(DISTINCT(u)),COUNT(DISTINCT(u.password))"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     num_cracked = resp[0]['row'][0]
@@ -1138,7 +1245,10 @@ def dpat_func(args):
         perc_uniq_cracked = 00.00
 
     # lm hash stats
-    query = "MATCH (u:User) WHERE u.lm_hash IS NOT NULL AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.lm_hash,count(u.lm_hash)"
+    if args.only_enabled:
+        query = "MATCH (u:User) WHERE u.enabled = TRUE AND u.lm_hash IS NOT NULL AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.lm_hash,count(u.lm_hash)"
+    else:
+        query = "MATCH (u:User) WHERE u.lm_hash IS NOT NULL AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.lm_hash,count(u.lm_hash)"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     lm_hash_counts = {}
@@ -1148,7 +1258,10 @@ def dpat_func(args):
     uniq_lm = len(lm_hash_counts)
 
     # lm hash users
-    query = "MATCH (u:User) WHERE u.lm_hash IS NOT NULL AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.name,u.lm_hash"
+    if args.only_enabled:
+        query = "MATCH (u:User) WHERE u.enabled = TRUE AND u.lm_hash IS NOT NULL AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.name,u.lm_hash"
+    else:
+        query = "MATCH (u:User) WHERE u.lm_hash IS NOT NULL AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.name,u.lm_hash"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
 
@@ -1160,7 +1273,10 @@ def dpat_func(args):
     lm_hash_list = sorted(lm_hash_list, key = lambda x: x[2], reverse=True)
 
     # matching username/password
-    query = "MATCH (u:User {cracked:true}) WHERE toUpper(SPLIT(u.name,'@')[0])=toUpper(u.password) RETURN u.ntds_uname,u.password,u.nt_hash"
+    if args.only_enabled:
+        query = "MATCH (u:User {cracked:true}) WHERE u.enabled = TRUE AND toUpper(SPLIT(u.name,'@')[0])=toUpper(u.password) RETURN u.ntds_uname,u.password,u.nt_hash"
+    else:
+        query = "MATCH (u:User {cracked:true}) WHERE toUpper(SPLIT(u.name,'@')[0])=toUpper(u.password) RETURN u.ntds_uname,u.password,u.nt_hash"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     user_pass_match_list = []
@@ -1169,7 +1285,10 @@ def dpat_func(args):
     user_pass_match = len(user_pass_match_list)
 
     # Get Password Length Stats
-    query = "MATCH (u:User {cracked:true}) WHERE NOT u.password='' RETURN  COUNT(SIZE(u.password)), SIZE(u.password) AS sz ORDER BY sz DESC"
+    if args.only_enabled:
+        query = "MATCH (u:User {cracked:true}) WHERE u.enabled = TRUE AND NOT u.password='' RETURN  COUNT(SIZE(u.password)), SIZE(u.password) AS sz ORDER BY sz DESC"
+    else:
+        query = "MATCH (u:User {cracked:true}) WHERE NOT u.password='' RETURN  COUNT(SIZE(u.password)), SIZE(u.password) AS sz ORDER BY sz DESC"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     password_lengths = []
@@ -1179,7 +1298,10 @@ def dpat_func(args):
     # Get Password (Complexity) Stats
     # sort from most reused to least reused dict to list of tuples
     # get the first instance of not repeated password to be min'd later
-    query = "MATCH (u:User {cracked:true}) WHERE NOT u.password='' RETURN COUNT(u.password) AS countpwd, u.password ORDER BY countpwd DESC"
+    if args.only_enabled:
+        query = "MATCH (u:User {cracked:true}) WHERE u.enabled = TRUE AND NOT u.password='' RETURN COUNT(u.password) AS countpwd, u.password ORDER BY countpwd DESC"
+    else:
+        query = "MATCH (u:User {cracked:true}) WHERE NOT u.password='' RETURN COUNT(u.password) AS countpwd, u.password ORDER BY countpwd DESC"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     repeated_passwords = []
@@ -1198,7 +1320,10 @@ def dpat_func(args):
         lambda s: any(x in special_chars for x in s)
     ]
 
-    query = "MATCH (u:User {cracked:true}) WHERE NOT u.password='' RETURN u.password,u.ntds_uname"
+    if args.only_enabled:
+        query = "MATCH (u:User {cracked:true}) WHERE u.enabled = TRUE AND NOT u.password='' RETURN u.password,u.ntds_uname"
+    else:
+        query = "MATCH (u:User {cracked:true}) WHERE NOT u.password='' RETURN u.password,u.ntds_uname"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     password_complexity = []
@@ -1210,22 +1335,40 @@ def dpat_func(args):
     password_complexity = sorted(password_complexity, key = lambda x: x[2])
 
     # all stats
-    stats = [
-        [num_pass_hashes, "Password Hashes", ["NTDS Username", "Password", "Password Length", "NT Hash", "Pwd Last Set"], num_pass_hashes_list], #, ntds_parsed],
-        [num_uniq_hash, "Unique Password Hashes"],
-        [num_cracked, "Passwords Discovered Through Cracking"],
-        [perc_total_cracked, "Percent of Passwords Cracked"],
-        [perc_uniq_cracked, "Percent of Unique Passwords Cracked"],
-        [non_blank_lm, "LM Hashes (Non-Blank)", ["NTDS Username", "LM Hash", "Shared Count"], lm_hash_list],
-        [uniq_lm, "Unique LM Hashes (Non-Blank)"],
-        [user_pass_match, "Users with Username Matching Password", ["NTDS Username", "Password", "Password Length", "NT Hash"], user_pass_match_list],
-        [len(password_lengths), "Password Length Stats", ['Count', 'Number of Characters'], password_lengths],
-        [len(password_complexity), "Password Complexity Stats", ['Username', 'Password', "Meets Complexity Requirements"], password_complexity],
-        [len(repeated_passwords), "Password Reuse Stats", ['Count', 'Password'], repeated_passwords],
-    ]
+    if args.only_enabled:
+        stats = [
+            [num_pass_hashes, "Enabled Password Hashes", ["NTDS Username", "Password", "Password Length", "NT Hash", "Pwd Last Set"], num_pass_hashes_list], #, ntds_parsed],
+            [num_uniq_hash, "Enabled Unique Password Hashes"],
+            [num_cracked, "Enabled Passwords Discovered Through Cracking"],
+            [perc_total_cracked, "Percent of Enabled Passwords Cracked"],
+            [perc_uniq_cracked, "Percent of Enabled Unique Passwords Cracked"],
+            [non_blank_lm, "Enabled LM Hashes (Non-Blank)", ["NTDS Username", "LM Hash", "Shared Count"], lm_hash_list],
+            [uniq_lm, "Unique Enabled LM Hashes (Non-Blank)"],
+            [user_pass_match, "Enabled Users with Username Matching Password", ["NTDS Username", "Password", "Password Length", "NT Hash"], user_pass_match_list],
+            [len(password_lengths), "Enabled Password Length Stats", ['Count', 'Number of Characters'], password_lengths],
+            [len(password_complexity), "Enabled Password Complexity Stats", ['Username', 'Password', "Meets Complexity Requirements"], password_complexity],
+            [len(repeated_passwords), "Enabled Password Reuse Stats", ['Count', 'Password'], repeated_passwords],
+        ]
+    else:
+        stats = [
+            [num_pass_hashes, "Password Hashes", ["NTDS Username", "Password", "Password Length", "NT Hash", "Pwd Last Set"], num_pass_hashes_list], #, ntds_parsed],
+            [num_uniq_hash, "Unique Password Hashes"],
+            [num_cracked, "Passwords Discovered Through Cracking"],
+            [perc_total_cracked, "Percent of Passwords Cracked"],
+            [perc_uniq_cracked, "Percent of Unique Passwords Cracked"],
+            [non_blank_lm, "LM Hashes (Non-Blank)", ["NTDS Username", "LM Hash", "Shared Count"], lm_hash_list],
+            [uniq_lm, "Unique LM Hashes (Non-Blank)"],
+            [user_pass_match, "Users with Username Matching Password", ["NTDS Username", "Password", "Password Length", "NT Hash"], user_pass_match_list],
+            [len(password_lengths), "Password Length Stats", ['Count', 'Number of Characters'], password_lengths],
+            [len(password_complexity), "Password Complexity Stats", ['Username', 'Password', "Meets Complexity Requirements"], password_complexity],
+            [len(repeated_passwords), "Password Reuse Stats", ['Count', 'Password'], repeated_passwords],
+        ]
 
     if not args.less:
-        stats.append([len(group_data), "Groups Cracked by Percentage",  ["Group Name", "Percent Cracked", "Cracked Users", "Total Users"], group_data])
+        if args.only_enabled:
+            stats.append([len(group_data), "Groups with Enabled users Cracked by Percentage",  ["Group Name", "Percent Cracked", "Cracked Users", "Total Users"], group_data])
+        else:
+            stats.append([len(group_data), "Groups Cracked by Percentage",  ["Group Name", "Percent Cracked", "Cracked Users", "Total Users"], group_data])
 
     # set all users with cracked passwords as owned
     if args.own_cracked:
@@ -1610,6 +1753,7 @@ def main():
     dpat.add_argument("--html",dest="html",action="store_true",required=False,help="Store the output in HTML format")
     dpat.add_argument("--own-cracked", dest="own_cracked", action="store_true", required=False, help="Mark all users with cracked passwords as owned")
     dpat.add_argument("--add-crack-note",dest="add_crack_note",action="store_true",required=False,help="Add a note to cracked users indicating they have been cracked")
+    dpat.add_argument("--only-enabled", dest="only_enabled", action="store_true", required=False, help="Only compute stats on enabled users")
 
     args = parser.parse_args()
 
